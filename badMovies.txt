@@ -22,7 +22,13 @@ movieWithOneStar = FILTER avgRatings BY avgRating < 2.0;
 #join the tables
 movieNameWithOneStar = JOIN movieWithOneStar BY movieID, nameLookup BY movieID;
 
+#generate a new table
+finalResults = FOREACH movieNameWithOneStar 
+			GENERATE nameLookup::movieTitle AS movieName, 
+            	movieWithOneStar::avgRating AS movieRating, 
+                movieWithOneStar::timesRated AS timesRated;
+
 #order it in descending
-worstOneStarMovies = ORDER movieNameWithOneStar BY movieWithOneStar::timesRated DESC;
+worstOneStarMovies = ORDER finalResults BY timesRated DESC;
 
 DUMP worstOneStarMovies;
