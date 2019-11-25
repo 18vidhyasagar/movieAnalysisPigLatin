@@ -1,0 +1,28 @@
+#pull the ratings from u.data in HDFS 
+ratings = LOAD '/user/maria_dev/ml-100k/u.data' AS (userID:int, movieID:int, rating:int, ratingTime:int);
+
+#pull the item details from u.iotem in HDFS
+metadata = LOAD '/user/maria_dev/ml-100k/u.item' USING PigStorage('|') 
+			AS (movieID:int, movieTitle:chararray, releaseDate:chararray, videoRelease:chararray, imdbLink:chararray);
+     
+#create a new schema for name table
+nameLookup = FOREACH metadata generate movieID, movieTitle;
+
+#create groups with movies (all the ratings columns will be thrown into bags of key/values, just like reduce)
+#key being movieID values being entries (4 columns) with the movieID
+ratingsByMovie = GROUP ratings BY movieID;
+
+#generate a new schema from the group created above and name it as movieID, avgRating and timesRated
+avgRatings = FOREACH ratingsByMovie GENERATE group 
+			AS movieID, AVG(ratings.rating) as avgRating, COUNT(ratings.rating) as timesRated;
+
+#filter to movies having rating less than 2, now the table will have movieID and avgRating, timesRated
+movieWithOneStar = FILTER avgRatings BY avgRating < 2.0;
+
+#join the tables
+movieNameWithOneStar = JOIN movieWithOneStar BY movieID, nameLookup BY movieID;
+
+#order it in descending
+worstOneStarMovies = ORDER movieNameWithOneStar BY movieWithOneStar::timesRated DESC;
+
+DUMP worstOneStarMovies;
