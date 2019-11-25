@@ -1,13 +1,29 @@
+#pull the ratings from u.data in HDFS 
 ratings = LOAD '/user/maria_dev/ml-100k/u.data' AS (userID:int, movieID:int, rating:int, ratingTime:int);
+
+#pull the item details from u.iotem in HDFS
 metadata = LOAD '/user/maria_dev/ml-100k/u.item' USING PigStorage('|')
 	AS (movieID:int, movieTitle:chararray, releaseDate:chararray, videoRealese:chararray, imdblink:chararray);
-   
+ 
+#create a new schema for name table
 nameLookup = FOREACH metadata GENERATE movieID, movieTitle,
 	ToUnixTime(ToDate(releaseDate, 'dd-MMM-yyyy')) AS releaseTime;
-   
+
+#create groups with movies (all the ratings columns will be thrown into bags of key/values)
+#key being movieID values being entries (4 columns) with the movieID
 ratingsByMovie = GROUP ratings BY movieID;
+
+#generate a new schema from the group created above and name it as movieID
 avgRatings = FOREACH ratingsByMovie GENERATE group as movieID, AVG(ratings.rating) as avgRating;
+
+#filter to movies having rating more than 4, now the table will have movieID and avgRating
 fiveStarMovies = FILTER avgRatings BY avgRating > 4.0;
+
+#join the tables
 fiveStarsWithData = JOIN fiveStarMovies BY movieID, nameLookup BY movieID;
+
+#sort to find the oldest movie
 oldestFiveStarMovies = ORDER fiveStarsWithData BY nameLookup::releaseTime;
+
+#dump into the console
 DUMP oldestFiveStarMovies;
